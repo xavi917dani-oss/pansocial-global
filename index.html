@@ -627,7 +627,7 @@
         if (strip) strip.classList.remove('active');
     };
 
-    async function translateText(text, sourceLang, targetLang) {
+  async function translateText(text, sourceLang, targetLang) {
         if (!text || sourceLang === targetLang) return text;
         const cacheKey = `${sourceLang}|${targetLang}|${text}`;
         if (translationCache.has(cacheKey)) {
