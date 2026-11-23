@@ -85,7 +85,17 @@
         .cancel-edit-btn { background-color: #343444; color: #ddd; border: none; padding: 5px 10px; border-radius: 7px; font-size: 0.78rem; cursor: pointer; }
 
         .post-body { font-size: 0.95rem; line-height: 1.45; white-space: pre-wrap; }
-        .post-img { width: 100%; max-height: 260px; object-fit: cover; border-radius: 10px; border: 1px solid #3e3e50; }
+      .post-img {
+            width: 100%;
+            max-height: 540px;
+            height: auto;
+            object-fit: contain;
+            background-color: #16161d;
+            border-radius: 10px;
+            border: 1px solid #3e3e50;
+            cursor: zoom-in;
+            display: block;
+        }
         .original-text { font-size: 0.78rem; color: #9ce6c2; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.18); font-style: italic; }
 
         /* Acciones del muro: Responder, Compartir, Me gusta */
@@ -1384,7 +1394,23 @@
     subscribeToFeed();
     subscribeToAllPrivateChats();
     subscribeToPath(currentDbPath);
+    // Visor a pantalla completa para ver fotos del muro al detalle
+    const imgZoomOverlay = document.createElement('div');
+    imgZoomOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:100000;display:none;align-items:center;justify-content:center;padding:16px;cursor:zoom-out;';
+    imgZoomOverlay.innerHTML = '<img id="zoomedImgTarget" style="max-width:96vw;max-height:94vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.8);">';
+    imgZoomOverlay.onclick = () => { imgZoomOverlay.style.display = 'none'; };
+    document.body.appendChild(imgZoomOverlay);
+
+    if (feedBox) {
+        feedBox.addEventListener('click', (e) => {
+            const img = e.target.closest('img.post-img');
+            if (!img) return;
+            document.getElementById('zoomedImgTarget').src = img.src;
+            imgZoomOverlay.style.display = 'flex';
+        });
+    }
 </script>
 
 </body>
 </html>
+
