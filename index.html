@@ -330,11 +330,13 @@
     let currentChatRef = null;
     let viewedProfileHandle = '';
 
-    let selectedPostImage = '';
+ let selectedPostImage = '';
     let latestMessages = [];
     let latestPosts = [];
     let allPrivateChatsData = {};
     let profilesMap = {};
+    let followingSet = new Set();
+    let followingRefCurrent = null;
     let openReplyPostIds = new Set();
     let editingPostId = null;
 
@@ -1303,6 +1305,33 @@
             updateMyHeaderAvatar();
             renderDmShortcuts();
             await refreshActiveView();
+        });
+    }
+
+    function subscribeToFollowing() {
+        const myHandle = normalizeHandle(lockedHandle || getMyHandle());
+        if (followingRefCurrent) {
+            off(followingRefCurrent);
+            followingRefCurrent = null;
+        }
+        if (!myHandle) {
+            followingSet = new Set();
+            return;
+        }
+        followingRefCurrent = ref(db, `following/${myHandle}`);
+        onValue(followingRefCurrent, async (snapshot) => {
+            const val = snapshot.val() || {};
+            followingSet = new Set(
+                Object.entries(val)
+                    .filter(([, active]) => Boolean(active))
+                    .map(([target]) => normalizeHandle(target))
+                    .filter(Boolean)
+            );
+            if (activeTab === 'feed' || activeTab === 'profile') {
+                await refreshActiveView();
+            }
+        });
+    }
         });
     }
 
