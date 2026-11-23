@@ -330,7 +330,7 @@
     let currentChatRef = null;
     let viewedProfileHandle = '';
 
- let selectedPostImage = '';
+    let selectedPostImage = '';
     let latestMessages = [];
     let latestPosts = [];
     let allPrivateChatsData = {};
@@ -406,7 +406,6 @@
         if (!email || pass.length < 6) { errBox.textContent = 'Usa un correo válido y contraseña de 6+ caracteres.'; return; }
 
         try {
-            // Verificar si ese @usuario ya existe
             const handleSnap = await get(ref(db, `usernames/${handle}`));
             if (handleSnap.exists()) {
                 errBox.textContent = `El usuario @${handle} ya está ocupado.`;
@@ -423,7 +422,7 @@
         }
     };
 
-  onAuthStateChanged(auth, async (user) => {
+    onAuthStateChanged(auth, async (user) => {
         currentAuthUser = user;
         if (!user) {
             lockedHandle = '';
@@ -438,7 +437,6 @@
             return;
         }
 
-        // Recuperar el @usuario vinculado a este uid
         let handle = '';
         try {
             const snap = await get(ref(db, `users/${user.uid}/handle`));
@@ -463,30 +461,6 @@
         if (typeof updateMyHeaderAvatar === 'function') updateMyHeaderAvatar();
     });
 
-        // Recuperar el @usuario vinculado a este uid
-        let handle = '';
-        try {
-            const snap = await get(ref(db, `users/${user.uid}/handle`));
-            if (snap.exists()) handle = cleanHandleStr(snap.val());
-        } catch {}
-
-        if (!handle) {
-            handle = cleanHandleStr((user.email || '').split('@')[0]) || ('user_' + user.uid.slice(0, 5));
-            await set(ref(db, `users/${user.uid}`), { handle, email: user.email || '', createdAt: Date.now() });
-            await update(ref(db, `profiles/${handle}`), { handle, uid: user.uid });
-        }
-
-        lockedHandle = handle;
-        if (userName) {
-            userName.value = handle;
-            userName.readOnly = true;
-            userName.title = 'Usuario vinculado a tu cuenta';
-        }
-        authModal.style.display = 'none';
-        logoutBtn.style.display = 'block';
-        if (typeof updateMyHeaderAvatar === 'function') updateMyHeaderAvatar();
-    });
-
     const translationCache = new Map();
     window.panClientId = 'client_' + Math.random().toString(36).slice(2, 9);
 
@@ -499,7 +473,7 @@
     }
 
     function getMyHandle() {
-        return normalizeHandle(userName.value) || 'usuario';
+        return normalizeHandle(lockedHandle || userName.value) || 'usuario';
     }
 
     function buildPrivatePairId(userA, userB) {
@@ -580,9 +554,7 @@
             gain.connect(ctx.destination);
             osc.start();
             osc.stop(ctx.currentTime + 0.19);
-        } catch {
-            // Ignorar si el navegador bloquea audio sin gesto previo
-        }
+        } catch {}
     }
 
     function refreshUnreadBadges() {
@@ -707,9 +679,9 @@
     window.handleAvatarUpload = async function(event) {
         const file = event.target.files?.[0];
         if (!file) return;
-        const myHandle = normalizeHandle(userName.value);
+        const myHandle = getMyHandle();
         if (!myHandle) {
-            alert("Escribe primero tu @usuario antes de subir una foto de perfil.");
+            alert("Inicia sesión primero antes de subir una foto de perfil.");
             event.target.value = '';
             return;
         }
@@ -731,7 +703,7 @@
     };
 
     window.removeMyAvatar = async function() {
-        const myHandle = normalizeHandle(userName.value);
+        const myHandle = getMyHandle();
         if (!myHandle) return;
         const ok = confirm("¿Quieres eliminar tu foto de perfil?");
         if (!ok) return;
@@ -743,7 +715,7 @@
     };
 
     window.saveMyBio = async function() {
-        const myHandle = normalizeHandle(userName.value);
+        const myHandle = getMyHandle();
         const bioInput = document.getElementById('myBioInput');
         if (!myHandle || !bioInput) return;
 
@@ -788,7 +760,7 @@
         if (strip) strip.classList.remove('active');
     };
 
-  async function translateText(text, sourceLang, targetLang) {
+    async function translateText(text, sourceLang, targetLang) {
         if (!text || sourceLang === targetLang) return text;
         const cacheKey = `${sourceLang}|${targetLang}|${text}`;
         if (translationCache.has(cacheKey)) {
@@ -880,9 +852,35 @@
         connectPrivateChat();
     };
 
+    window.toggleFollowUser = async function(rawTargetHandle) {
+        const myHandle = getMyHandle();
+        const targetHandle = normalizeHandle(rawTargetHandle);
+        if (!currentAuthUser || !myHandle) {
+            alert("Inicia sesión primero para seguir usuarios.");
+            return;
+        }
+        if (!targetHandle || targetHandle === myHandle) return;
+
+        const targetRef = ref(db, `following/${myHandle}/${targetHandle}`);
+        if (followingSet.has(targetHandle)) {
+            await remove(targetRef);
+        } else {
+            await set(targetRef, true);
+        }
+    };
+
+    function renderFollowButtonHtml(targetHandle) {
+        const myHandle = getMyHandle();
+        const cleanTarget = normalizeHandle(targetHandle);
+        if (!cleanTarget || cleanTarget === myHandle) return '';
+        const isFollowing = followingSet.has(cleanTarget);
+        const label = isFollowing ? '✓ Siguiendo' : '+ Seguir';
+        return `<button type="button" class="mini-btn" onclick="toggleFollowUser('${escapeHtml(cleanTarget)}')">${label}</button>`;
+    }
+
     window.refreshActiveView = async function() {
         if (activeTab === 'feed') {
-            const myHandle = normalizeHandle(lockedHandle || getMyHandle());
+            const myHandle = getMyHandle();
             const followedPosts = latestPosts.filter((post) => {
                 const authorHandle = normalizeHandle(post.author || post.handle || post.user || '');
                 if (!authorHandle) return false;
@@ -1064,6 +1062,7 @@
                 </div>
             ` : `
                 <div class="profile-controls">
+                    ${renderFollowButtonHtml(targetHandle)}
                     <button type="button" class="post-btn" onclick="startDirectChatWith('${escapeHtml(targetHandle)}')">💬 Enviar mensaje privado</button>
                 </div>
             `}
@@ -1349,12 +1348,12 @@
     }
 
     function subscribeToFollowing() {
-        const myHandle = normalizeHandle(lockedHandle || getMyHandle());
+        const myHandle = getMyHandle();
         if (followingRefCurrent) {
             off(followingRefCurrent);
             followingRefCurrent = null;
         }
-        if (!myHandle) {
+        if (!myHandle || myHandle === 'usuario') {
             followingSet = new Set();
             return;
         }
@@ -1370,8 +1369,6 @@
             if (activeTab === 'feed' || activeTab === 'profile') {
                 await refreshActiveView();
             }
-        });
-    }
         });
     }
 
@@ -1463,6 +1460,7 @@
     subscribeToFeed();
     subscribeToAllPrivateChats();
     subscribeToPath(currentDbPath);
+
     // Visor a pantalla completa para ver fotos del muro al detalle
     const imgZoomOverlay = document.createElement('div');
     imgZoomOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:100000;display:none;align-items:center;justify-content:center;padding:16px;cursor:zoom-out;';
@@ -1479,7 +1477,7 @@
         });
     }
 </script>
-
+    
 </body>
 </html>
 
