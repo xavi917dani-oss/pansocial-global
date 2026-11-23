@@ -367,6 +367,44 @@
         </div>
     `;
     document.body.appendChild(authModal);
+    function cleanHandleStr(raw) {
+        return String(raw || '').trim().toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9_-]/g, '');
+    }
+
+    document.getElementById('authRegisterBtn').onclick = async () => {
+        const rawHandle = document.getElementById('authHandleInput').value;
+        const handle = cleanHandleStr(rawHandle);
+        const email = document.getElementById('authEmailInput').value.trim();
+        const pass = document.getElementById('authPassInput').value;
+        const errBox = document.getElementById('authErrorMsg');
+        errBox.textContent = '';
+
+        if (handle.length < 3) {
+            errBox.textContent = 'El @usuario debe tener al menos 3 letras o números.';
+            return;
+        }
+        if (!email || pass.length < 6) {
+            errBox.textContent = 'Usa un correo válido y contraseña de 6+ caracteres.';
+            return;
+        }
+
+        try {
+            const handleSnap = await get(ref(db, `usernames/${handle}`));
+            if (handleSnap.exists()) {
+                errBox.textContent = `El usuario @${handle} ya está ocupado.`;
+                return;
+            }
+            const cred = await createUserWithEmailAndPassword(auth, email, pass);
+            await set(ref(db, `usernames/${handle}`), cred.user.uid);
+            await set(ref(db, `users/${cred.user.uid}`), { handle, email, createdAt: Date.now() });
+            await update(ref(db, `profiles/${handle}`), { handle, uid: cred.user.uid });
+        } catch (e) {
+            const detail = e?.code || e?.message || 'Error desconocido';
+            errBox.textContent = e?.code === 'auth/email-already-in-use'
+                ? 'Ese correo ya tiene cuenta. Pulsa "Entrar".'
+                : `No se pudo crear la cuenta (${detail}).`;
+        }
+    };
 
     // Botón rápido para cerrar sesión en la esquina superior derecha
     const logoutBtn = document.createElement('button');
