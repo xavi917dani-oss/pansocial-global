@@ -423,15 +423,45 @@
         }
     };
 
-    onAuthStateChanged(auth, async (user) => {
+  onAuthStateChanged(auth, async (user) => {
         currentAuthUser = user;
         if (!user) {
             lockedHandle = '';
+            followingSet = new Set();
+            if (followingRefCurrent) {
+                off(followingRefCurrent);
+                followingRefCurrent = null;
+            }
             authModal.style.display = 'flex';
             logoutBtn.style.display = 'none';
             if (userName) { userName.value = ''; userName.readOnly = false; }
             return;
         }
+
+        // Recuperar el @usuario vinculado a este uid
+        let handle = '';
+        try {
+            const snap = await get(ref(db, `users/${user.uid}/handle`));
+            if (snap.exists()) handle = cleanHandleStr(snap.val());
+        } catch {}
+
+        if (!handle) {
+            handle = cleanHandleStr((user.email || '').split('@')[0]) || ('user_' + user.uid.slice(0, 5));
+            await set(ref(db, `users/${user.uid}`), { handle, email: user.email || '', createdAt: Date.now() });
+            await update(ref(db, `profiles/${handle}`), { handle, uid: user.uid });
+        }
+
+        lockedHandle = handle;
+        subscribeToFollowing();
+        if (userName) {
+            userName.value = handle;
+            userName.readOnly = true;
+            userName.title = 'Usuario vinculado a tu cuenta';
+        }
+        authModal.style.display = 'none';
+        logoutBtn.style.display = 'block';
+        if (typeof updateMyHeaderAvatar === 'function') updateMyHeaderAvatar();
+    });
 
         // Recuperar el @usuario vinculado a este uid
         let handle = '';
@@ -852,7 +882,17 @@
 
     window.refreshActiveView = async function() {
         if (activeTab === 'feed') {
-            await renderPosts(latestPosts, feedBox, "Aún no hay publicaciones. ¡Escribe la primera idea o pensamiento!");
+            const myHandle = normalizeHandle(lockedHandle || getMyHandle());
+            const followedPosts = latestPosts.filter((post) => {
+                const authorHandle = normalizeHandle(post.author || post.handle || post.user || '');
+                if (!authorHandle) return false;
+                return authorHandle === myHandle || followingSet.has(authorHandle);
+            });
+            await renderPosts(
+                followedPosts,
+                feedBox,
+                "Aún no hay publicaciones de personas que sigues. Busca un @usuario en Perfil para seguirlo."
+            );
         } else if (activeTab === 'chat') {
             await renderMessages(latestMessages);
         } else if (activeTab === 'profile') {
