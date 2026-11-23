@@ -268,12 +268,19 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getDatabase, ref, push, update, remove, onValue, off } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+    import { getDatabase, ref, push, update, remove, onValue, off, get, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-    const DATABASE_URL = "https://panchat-america-default-rtdb.firebaseio.com";
+    const firebaseConfig = {
+        apiKey: "PEGA_AQUI_TU_API_KEY",
+        authDomain: "panchat-america.firebaseapp.com",
+        databaseURL: "https://panchat-america-default-rtdb.firebaseio.com",
+        projectId: "panchat-america"
+    };
 
-    const app = initializeApp({ databaseURL: DATABASE_URL });
+    const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
+    const auth = getAuth(app);
 
     const feedBox = document.getElementById('feedBox');
     const postText = document.getElementById('postText');
@@ -325,6 +332,118 @@
     const notifiedMessageKeys = new Set();
     const unreadByPeer = new Map();
     const recentPeers = new Set();
+
+    // --- PANEL FLOTANTE DE ACCESO (LOGIN / REGISTRO) ---
+    let currentAuthUser = null;
+    let lockedHandle = '';
+
+    const authModal = document.createElement('div');
+    authModal.id = 'panAuthOverlay';
+    authModal.style.cssText = 'position:fixed;inset:0;background:rgba(10,11,20,0.92);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;font-family:sans-serif;';
+    authModal.innerHTML = `
+        <div style="background:#181a28;color:#fff;width:100%;max-width:360px;padding:22px;border-radius:14px;border:1px solid #2e324d;box-shadow:0 12px 32px rgba(0,0,0,0.5);">
+            <h2 style="margin:0 0 6px;font-size:1.25rem;text-align:center;">🌎 PanSocial Global</h2>
+            <p style="margin:0 0 16px;font-size:0.84rem;color:#a5a9c7;text-align:center;">Inicia sesión o crea tu cuenta para entrar</p>
+            <input id="authHandleInput" type="text" placeholder="Tu @usuario (solo al registrarte)" style="width:100%;box-sizing:border-box;padding:10px;margin-bottom:10px;border-radius:8px;border:1px solid #353957;background:#10121c;color:#fff;">
+            <input id="authEmailInput" type="email" placeholder="Correo electrónico" style="width:100%;box-sizing:border-box;padding:10px;margin-bottom:10px;border-radius:8px;border:1px solid #353957;background:#10121c;color:#fff;">
+            <input id="authPassInput" type="password" placeholder="Contraseña (mín. 6 caracteres)" style="width:100%;box-sizing:border-box;padding:10px;margin-bottom:12px;border-radius:8px;border:1px solid #353957;background:#10121c;color:#fff;">
+            <div id="authErrorMsg" style="color:#ff7b7b;font-size:0.8rem;min-height:18px;margin-bottom:10px;text-align:center;"></div>
+            <div style="display:flex;gap:8px;">
+                <button id="authLoginBtn" type="button" style="flex:1;padding:10px;border:none;border-radius:8px;background:#4f6ef7;color:#fff;font-weight:bold;cursor:pointer;">Entrar</button>
+                <button id="authRegisterBtn" type="button" style="flex:1;padding:10px;border:1px solid #4f6ef7;border-radius:8px;background:transparent;color:#9bb0ff;font-weight:bold;cursor:pointer;">Crear cuenta</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(authModal);
+
+    // Botón rápido para cerrar sesión en la esquina superior derecha
+    const logoutBtn = document.createElement('button');
+    logoutBtn.type = 'button';
+    logoutBtn.textContent = 'Salir';
+    logoutBtn.title = 'Cerrar sesión';
+    logoutBtn.style.cssText = 'position:fixed;top:10px;right:10px;z-index:9998;background:#2a2d42;color:#ff9b9b;border:1px solid #444866;border-radius:8px;padding:5px 10px;font-size:0.75rem;cursor:pointer;display:none;';
+    logoutBtn.onclick = () => signOut(auth);
+    document.body.appendChild(logoutBtn);
+
+    function cleanHandleStr(raw) {
+        return String(raw || '').trim().toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9_-]/g, '');
+    }
+
+    document.getElementById('authLoginBtn').onclick = async () => {
+        const email = document.getElementById('authEmailInput').value.trim();
+        const pass = document.getElementById('authPassInput').value;
+        const errBox = document.getElementById('authErrorMsg');
+        errBox.textContent = '';
+        if (!email || !pass) { errBox.textContent = 'Escribe tu correo y contraseña.'; return; }
+        try {
+            await signInWithEmailAndPassword(auth, email, pass);
+        } catch (e) {
+            errBox.textContent = 'Correo o contraseña incorrectos.';
+        }
+    };
+
+    document.getElementById('authRegisterBtn').onclick = async () => {
+        const rawHandle = document.getElementById('authHandleInput').value;
+        const handle = cleanHandleStr(rawHandle);
+        const email = document.getElementById('authEmailInput').value.trim();
+        const pass = document.getElementById('authPassInput').value;
+        const errBox = document.getElementById('authErrorMsg');
+        errBox.textContent = '';
+
+        if (handle.length < 3) { errBox.textContent = 'El @usuario debe tener al menos 3 letras o números.'; return; }
+        if (!email || pass.length < 6) { errBox.textContent = 'Usa un correo válido y contraseña de 6+ caracteres.'; return; }
+
+        try {
+            // Verificar si ese @usuario ya existe
+            const handleSnap = await get(ref(db, `usernames/${handle}`));
+            if (handleSnap.exists()) {
+                errBox.textContent = `El usuario @${handle} ya está ocupado.`;
+                return;
+            }
+            const cred = await createUserWithEmailAndPassword(auth, email, pass);
+            await set(ref(db, `usernames/${handle}`), cred.user.uid);
+            await set(ref(db, `users/${cred.user.uid}`), { handle, email, createdAt: Date.now() });
+            await update(ref(db, `profiles/${handle}`), { handle, uid: cred.user.uid });
+        } catch (e) {
+            errBox.textContent = e?.code === 'auth/email-already-in-use'
+                ? 'Ese correo ya tiene cuenta. Pulsa "Entrar".'
+                : 'No se pudo crear la cuenta. Revisa tus datos.';
+        }
+    };
+
+    onAuthStateChanged(auth, async (user) => {
+        currentAuthUser = user;
+        if (!user) {
+            lockedHandle = '';
+            authModal.style.display = 'flex';
+            logoutBtn.style.display = 'none';
+            if (userName) { userName.value = ''; userName.readOnly = false; }
+            return;
+        }
+
+        // Recuperar el @usuario vinculado a este uid
+        let handle = '';
+        try {
+            const snap = await get(ref(db, `users/${user.uid}/handle`));
+            if (snap.exists()) handle = cleanHandleStr(snap.val());
+        } catch {}
+
+        if (!handle) {
+            handle = cleanHandleStr((user.email || '').split('@')[0]) || ('user_' + user.uid.slice(0, 5));
+            await set(ref(db, `users/${user.uid}`), { handle, email: user.email || '', createdAt: Date.now() });
+            await update(ref(db, `profiles/${handle}`), { handle, uid: user.uid });
+        }
+
+        lockedHandle = handle;
+        if (userName) {
+            userName.value = handle;
+            userName.readOnly = true;
+            userName.title = 'Usuario vinculado a tu cuenta';
+        }
+        authModal.style.display = 'none';
+        logoutBtn.style.display = 'block';
+        if (typeof updateMyHeaderAvatar === 'function') updateMyHeaderAvatar();
+    });
 
     const translationCache = new Map();
     window.panClientId = 'client_' + Math.random().toString(36).slice(2, 9);
