@@ -415,10 +415,6 @@
     logoutBtn.onclick = () => signOut(auth);
     document.body.appendChild(logoutBtn);
 
-    function cleanHandleStr(raw) {
-        return String(raw || '').trim().toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9_-]/g, '');
-    }
-
     document.getElementById('authLoginBtn').onclick = async () => {
         const email = document.getElementById('authEmailInput').value.trim();
         const pass = document.getElementById('authPassInput').value;
@@ -454,9 +450,10 @@
             await set(ref(db, `users/${cred.user.uid}`), { handle, email, createdAt: Date.now() });
             await update(ref(db, `profiles/${handle}`), { handle, uid: cred.user.uid });
         } catch (e) {
+            const detail = e?.code || e?.message || 'Error desconocido';
             errBox.textContent = e?.code === 'auth/email-already-in-use'
                 ? 'Ese correo ya tiene cuenta. Pulsa "Entrar".'
-                : 'No se pudo crear la cuenta. Revisa tus datos.';
+                : `No se pudo crear la cuenta (${detail}).`;
         }
     };
 
