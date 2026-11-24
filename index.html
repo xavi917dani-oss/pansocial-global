@@ -1464,12 +1464,35 @@ function processFeedNotifications(data) {
         if (!post || typeof post !== 'object') continue;
 
         const postAuthor = normalizeHandle(post.author || post.handle || post.user || '');
-        const likesRaw = post.likes;
+   const likesRaw = post.likes;
         const likesCount = Array.isArray(likesRaw)
             ? likesRaw.filter(Boolean).length
             : likesRaw && typeof likesRaw === 'object'
                 ? Object.values(likesRaw).filter(Boolean).length
                 : Number(likesRaw) || 0;
+
+        const likesObj = likesRaw && typeof likesRaw === 'object' ? likesRaw : {};
+        const likeEntries = Array.isArray(likesRaw)
+            ? likesRaw
+                .map((val, idx) => {
+                    if (!val) return null;
+                    const key = typeof val === 'string' ? normalizeHandle(val) : `idx_${idx}`;
+                    const handle = typeof val === 'string'
+                        ? normalizeHandle(val)
+                        : normalizeHandle(val.author || val.handle || val.user || val.name || '');
+                    return { key, handle };
+                })
+                .filter(Boolean)
+            : Object.entries(likesObj)
+                .filter(([, val]) => Boolean(val))
+                .map(([key, val]) => {
+                    const handle = typeof val === 'object' && val !== null
+                        ? normalizeHandle(val.author || val.handle || val.user || val.name || key)
+                        : normalizeHandle(key);
+                    return { key: normalizeHandle(key) || key, handle };
+                });
+
+        const likeKeys = new Set(likeEntries.map((item) => item.key));
 
         const sharesRaw = post.shares;
         const sharesCount = Array.isArray(sharesRaw)
@@ -1484,14 +1507,36 @@ function processFeedNotifications(data) {
         const prev = prevPostEngagement.get(postId);
 
         if (!isInitialFeedSnapshot && prev && myHandle && postAuthor === myHandle) {
-            if (likesCount > prev.likesCount) {
+            const newLikers = likeEntries
+                .filter((item) => !prev.likeKeys.has(item.key))
+                .map((item) => item.handle)
+                .filter((handle) => handle && handle !== myHandle);
+
+            if (newLikers.length > 0) {
+                const uniqueLikers = [...new Set(newLikers)];
+                const title = uniqueLikers.length === 1
+                    ? `@${uniqueLikers[0]} le dio me gusta a tu publicación`
+                    : `${uniqueLikers.slice(0, 2).map((u) => `@${u}`).join(' y ')} le dieron me gusta a tu publicación`;
+                notifyPostActivity(title, post.text || 'Publicación en Eggs');
+            } else if (likesCount > prev.likesCount) {
+              const newLikers = likeEntries
+                .filter((item) => !prev.likeKeys.has(item.key))
+                .map((item) => item.handle)
+                .filter((handle) => handle && handle !== myHandle);
+
+            if (newLikers.length > 0) {
+                const uniqueLikers = [...new Set(newLikers)];
+                const title = uniqueLikers.length === 1
+                    ? `@${uniqueLikers[0]} le dio me gusta a tu publicación`
+                    : `${uniqueLikers.slice(0, 2).map((u) => `@${u}`).join(' y ')} le dieron me gusta a tu publicación`;
+                notifyPostActivity(title, post.text || 'Publicación en Eggs');
+            } else if (likesCount > prev.likesCount) {
                 const diff = likesCount - prev.likesCount;
                 notifyPostActivity(
                     diff > 1 ? `Alguien dio ${diff} me gusta a tu publicación` : 'A alguien le gustó tu publicación',
                     post.text || 'Publicación en Eggs'
                 );
             }
-
             if (sharesCount > prev.sharesCount) {
                 const diff = sharesCount - prev.sharesCount;
                 notifyPostActivity(
