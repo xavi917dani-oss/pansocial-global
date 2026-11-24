@@ -1080,6 +1080,7 @@ function subscribeToAllPrivateChats() {
                 </div>
             </div>
         `;
+        if (post && post.id) card.setAttribute('data-post-id', String(post.id));
         return card;
     }
 
