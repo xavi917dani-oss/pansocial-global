@@ -733,35 +733,58 @@ function processPrivateChatsNotifications(chatsData) {
     }
 }
 
+function processPrivateChatsNotifications(chatsData) {
+    allPrivateChatsData = chatsData && typeof chatsData === 'object' ? chatsData : {};
+    const myHandle = normalizeHandle(getMyHandle());
+    if (!myHandle) return;
+
+    let changed = false;
+    for (const [pairId, pairObj] of Object.entries(allPrivateChatsData)) {
+        const parts = pairId.split('__');
+        if (parts.length !== 2) continue;
+        const [u1, u2] = parts.map(h => normalizeHandle(h));
+        if (u1 !== myHandle && u2 !== myHandle) continue;
+
+        const peerHandle = u1 === myHandle ? u2 : u1;
+        recentPeers.add(peerHandle);
+
+        const msgsObj = pairObj && pairObj.messages && typeof pairObj.messages === 'object' ? pairObj.messages : {};
+        for (const [msgId, msg] of Object.entries(msgsObj)) {
+            if (!msg) continue;
+            const senderHandle = normalizeHandle(msg.sender);
+            if (!senderHandle || senderHandle === myHandle) continue;
+
+            const uniqueKey = `${pairId}/${msgId}`;
+            const isViewingThisDmNow =
+                activeTab === 'chat' &&
+                chatMode === 'dm' &&
+                normalizeHandle(currentPrivateTarget) === peerHandle;
+            const msgTime = Number(msg.timestamp || 0);
+
+            if (msgTime >= sessionStartTime - 1500 && !notifiedMessageKeys.has(uniqueKey)) {
+                notifiedMessageKeys.add(uniqueKey);
+                if (!isViewingThisDmNow) {
+                    unreadByPeer.set(peerHandle, (unreadByPeer.get(peerHandle) || 0) + 1);
+                    changed = true;
+                    showPrivateNotification(senderHandle, msg.text, msg.lang);
+                }
+            }
+        }
+    }
+
+    if (changed) {
+        refreshUnreadBadges();
+    } else {
+        renderDmShortcuts();
+    }
+}
+
 function subscribeToAllPrivateChats() {
     const privateRef = ref(db, 'privateChats');
     onValue(privateRef, (snapshot) => {
         processPrivateChatsNotifications(snapshot.val());
     });
 }
-
-    function compressImageFile(file, maxWidth = 700, quality = 0.72) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    const scale = img.width > maxWidth ? maxWidth / img.width : 1;
-                    const canvas = document.createElement('canvas');
-                    canvas.width = Math.round(img.width * scale);
-                    canvas.height = Math.round(img.height * scale);
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    resolve(canvas.toDataURL('image/jpeg', quality));
-                };
-                img.onerror = () => reject(new Error("No se pudo leer la imagen."));
-                img.src = e.target.result;
-            };
-            reader.onerror = () => reject(new Error("No se pudo abrir el archivo."));
-            reader.readAsDataURL(file);
-        });
-    }
-
     window.handleAvatarUpload = async function(event) {
         const file = event.target.files?.[0];
         if (!file) return;
