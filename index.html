@@ -1512,17 +1512,9 @@ function processFeedNotifications(data) {
                 .map((item) => item.handle)
                 .filter((handle) => handle && handle !== myHandle);
 
-            if (newLikers.length > 0) {
-                const uniqueLikers = [...new Set(newLikers)];
-                const title = uniqueLikers.length === 1
-                    ? `@${uniqueLikers[0]} le dio me gusta a tu publicación`
-                    : `${uniqueLikers.slice(0, 2).map((u) => `@${u}`).join(' y ')} le dieron me gusta a tu publicación`;
-                notifyPostActivity(title, post.text || 'Publicación en Eggs');
-            } else if (likesCount > prev.likesCount) {
-              const newLikers = likeEntries
-                .filter((item) => !prev.likeKeys.has(item.key))
-                .map((item) => item.handle)
-                .filter((handle) => handle && handle !== myHandle);
+           if (likesCount > prev.likesCount && newLikers.length === 0) {
+                console.log("Estructura real de post.likes:", post.likes, "likeEntries:", likeEntries);
+            }
 
             if (newLikers.length > 0) {
                 const uniqueLikers = [...new Set(newLikers)];
@@ -1559,8 +1551,12 @@ function processFeedNotifications(data) {
             }
         }
 
+        // ... aquí van los if de newLikers, sharesCount y commentIds ...
+        }
+
         prevPostEngagement.set(postId, {
             likesCount,
+            likeKeys,
             sharesCount,
             commentIds
         });
