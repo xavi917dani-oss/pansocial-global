@@ -1529,6 +1529,7 @@ function processFeedNotifications(data) {
                     post.text || 'Publicación en Eggs'
                 );
             }
+            
             if (sharesCount > prev.sharesCount) {
                 const diff = sharesCount - prev.sharesCount;
                 notifyPostActivity(
