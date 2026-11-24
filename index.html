@@ -1411,6 +1411,81 @@ function subscribeToAllPrivateChats() {
         });
     }
 
+    const prevPostEngagement = new Map();
+let isInitialFeedSnapshot = true;
+
+function notifyPostActivity(title, detail = '') {
+    if (typeof showPrivateNotification === 'function') {
+        showPrivateNotification(title, detail, 'es');
+    }
+}
+
+function processFeedNotifications(postsData) {
+    const myHandle = normalizeHandle(getMyHandle());
+    const postsObj = postsData && typeof postsData === 'object' ? postsData : {};
+
+    if (!myHandle) {
+        isInitialFeedSnapshot = false;
+        return;
+    }
+
+    for (const [postId, post] of Object.entries(postsObj)) {
+        if (!post || typeof post !== 'object') continue;
+
+        const postAuthor = normalizeHandle(post.author || post.handle || post.sender);
+        const likesCount = typeof post.likes === 'number'
+            ? post.likes
+            : (post.likes && typeof post.likes === 'object' ? Object.keys(post.likes).length : 0);
+
+        const sharesCount = typeof post.shares === 'number'
+            ? post.shares
+            : (post.shares && typeof post.shares === 'object' ? Object.keys(post.shares).length : 0);
+
+        const commentsObj = post.comments && typeof post.comments === 'object' ? post.comments : {};
+        const commentIds = new Set(Object.keys(commentsObj));
+
+        const prev = prevPostEngagement.get(postId);
+
+        if (!isInitialFeedSnapshot && prev && postAuthor === myHandle) {
+            if (likesCount > prev.likesCount) {
+                const diff = likesCount - prev.likesCount;
+                notifyPostActivity(
+                    diff > 1 ? `Alguien dio ${diff} me gusta a tu publicación` : "A alguien le gustó tu publicación",
+                    post.text || "Publicación en Eggs"
+                );
+            }
+
+            if (sharesCount > prev.sharesCount) {
+                const diff = sharesCount - prev.sharesCount;
+                notifyPostActivity(
+                    diff > 1 ? `Tu publicación se compartió ${diff} veces` : "Alguien compartió tu publicación",
+                    post.text || "Publicación en Eggs"
+                );
+            }
+
+            for (const commentId of commentIds) {
+                if (!prev.commentIds.has(commentId)) {
+                    const comment = commentsObj[commentId] || {};
+                    const commenter = normalizeHandle(comment.author || comment.handle || comment.sender);
+                    if (commenter && commenter !== myHandle) {
+                        notifyPostActivity(
+                            `@${commenter} comentó en tu publicación`,
+                            comment.text || post.text || "Nuevo comentario"
+                        );
+                    }
+                }
+            }
+        }
+
+        prevPostEngagement.set(postId, {
+            likesCount,
+            sharesCount,
+            commentIds
+        });
+    }
+
+    isInitialFeedSnapshot = false;
+}
     function subscribeToFeed() {
         const postsRef = ref(db, 'feed/posts');
         onValue(postsRef, async (snapshot) => {
