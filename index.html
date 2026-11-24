@@ -1418,6 +1418,19 @@ function notifyPostActivity(title, detail = '') {
     if (typeof showPrivateNotification === 'function') {
         showPrivateNotification(title, detail, 'es');
     }
+    if (typeof showToast === 'function') {
+        showToast(`${title}${detail ? ': ' + detail : ''}`);
+        return;
+    }
+    const el = document.getElementById('toastBanner') || document.querySelector('.toast-banner, .notification-toast');
+    if (el) {
+        el.textContent = detail ? `${title} — ${detail}` : title;
+        el.classList.add('show', 'active', 'visible');
+        clearTimeout(window._eggsToastTimer);
+        window._eggsToastTimer = setTimeout(() => {
+            el.classList.remove('show', 'active', 'visible');
+        }, 4000);
+    }
 }
 
 function processFeedNotifications(postsData) {
