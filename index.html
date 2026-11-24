@@ -1413,39 +1413,97 @@ function subscribeToAllPrivateChats() {
 
 const prevPostEngagement = new Map();
 let isInitialFeedSnapshot = true;
+const eggsNotificationsHistory = [];
+
+function ensureNotificationUI() {
+    if (!document.getElementById('eggsNotifBellWrap')) {
+        const wrap = document.createElement('div');
+        wrap.id = 'eggsNotifBellWrap';
+        wrap.style.cssText = 'position:fixed;top:14px;left:16px;z-index:999999;font-family:system-ui,-apple-system,sans-serif;';
+
+        wrap.innerHTML = `
+            <button id="eggsNotifBellBtn" type="button" style="position:relative;background:#18181b;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:999px;padding:8px 14px;cursor:pointer;font-size:14px;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,0.35);display:flex;align-items:center;gap:6px;">
+                <span>🔔 Notificaciones</span>
+                <span id="eggsNotifBadge" style="display:none;background:#ef4444;color:#fff;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;">0</span>
+            </button>
+            <div id="eggsNotifPanel" style="display:none;margin-top:8px;width:320px;max-height:380px;overflow-y:auto;background:#18181b;color:#fff;border:1px solid rgba(255,255,255,0.18);border-radius:12px;box-shadow:0 14px 30px rgba(0,0,0,0.5);padding:10px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 6px 8px;border-bottom:1px solid rgba(255,255,255,0.12);margin-bottom:8px;">
+                    <strong style="font-size:13px;">Actividad reciente</strong>
+                    <button id="eggsNotifClearBtn" type="button" style="background:none;border:none;color:#93c5fd;font-size:12px;cursor:pointer;">Limpiar</button>
+                </div>
+                <div id="eggsNotifList" style="display:flex;flex-direction:column;gap:8px;font-size:13px;">
+                    <div style="opacity:0.65;text-align:center;padding:16px 8px;">Sin notificaciones nuevas</div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(wrap);
+
+        const btn = document.getElementById('eggsNotifBellBtn');
+        const panel = document.getElementById('eggsNotifPanel');
+        const badge = document.getElementById('eggsNotifBadge');
+        const clearBtn = document.getElementById('eggsNotifClearBtn');
+
+        btn.addEventListener('click', () => {
+            const isOpen = panel.style.display === 'block';
+            panel.style.display = isOpen ? 'none' : 'block';
+            if (!isOpen) {
+                badge.style.display = 'none';
+                badge.textContent = '0';
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            eggsNotificationsHistory.length = 0;
+            renderNotificationPanel();
+        });
+    }
+}
+
+function renderNotificationPanel() {
+    ensureNotificationUI();
+    const list = document.getElementById('eggsNotifList');
+    if (!list) return;
+
+    if (eggsNotificationsHistory.length === 0) {
+        list.innerHTML = '<div style="opacity:0.65;text-align:center;padding:16px 8px;">Sin notificaciones nuevas</div>';
+        return;
+    }
+
+    list.innerHTML = eggsNotificationsHistory.map((item) => `
+        <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:8px 10px;line-height:1.35;">
+            <div style="font-weight:600;color:#f4f4f5;">${escapeHtml(item.title)}</div>
+            ${item.detail ? `<div style="font-size:12px;opacity:0.8;margin-top:3px;">${escapeHtml(item.detail)}</div>` : ''}
+            <div style="font-size:11px;opacity:0.55;margin-top:4px;">${escapeHtml(item.time)}</div>
+        </div>
+    `).join('');
+}
 
 function notifyPostActivity(title, detail = '') {
-    if (typeof showPrivateNotification === 'function') {
-        try {
-            showPrivateNotification(title, detail, 'es');
-        } catch (_) {}
+    ensureNotificationUI();
+
+    const now = new Date();
+    const time = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    eggsNotificationsHistory.unshift({ title, detail, time });
+    if (eggsNotificationsHistory.length > 30) eggsNotificationsHistory.pop();
+    renderNotificationPanel();
+
+    const badge = document.getElementById('eggsNotifBadge');
+    const panel = document.getElementById('eggsNotifPanel');
+    if (badge && panel && panel.style.display !== 'block') {
+        const nextCount = (parseInt(badge.textContent, 10) || 0) + 1;
+        badge.textContent = String(nextCount);
+        badge.style.display = 'inline-block';
     }
 
     let box = document.getElementById('eggsNotifToast');
     if (!box) {
         box = document.createElement('div');
         box.id = 'eggsNotifToast';
-        box.style.cssText = [
-            'position:fixed',
-            'top:16px',
-            'right:16px',
-            'z-index:999999',
-            'background:#18181b',
-            'color:#ffffff',
-            'border:1px solid rgba(255,255,255,0.2)',
-            'padding:12px 16px',
-            'border-radius:10px',
-            'box-shadow:0 10px 25px rgba(0,0,0,0.45)',
-            'font-family:system-ui,-apple-system,sans-serif',
-            'font-size:14px',
-            'max-width:320px',
-            'line-height:1.35',
-            'display:none'
-        ].join(';');
+        box.style.cssText = 'position:fixed;top:16px;right:16px;z-index:999999;background:#18181b;color:#ffffff;border:1px solid rgba(255,255,255,0.2);padding:12px 16px;border-radius:10px;box-shadow:0 10px 25px rgba(0,0,0,0.45);font-family:system-ui,-apple-system,sans-serif;font-size:14px;max-width:320px;line-height:1.35;display:none;';
         document.body.appendChild(box);
     }
 
-    box.innerHTML = `<div style="font-weight:700;margin-bottom:3px;">${title}</div>${detail ? `<div style="font-size:12px;opacity:0.85;">${detail}</div>` : ''}`;
+    box.innerHTML = `<div style="font-weight:700;margin-bottom:3px;">${escapeHtml(title)}</div>${detail ? `<div style="font-size:12px;opacity:0.85;">${escapeHtml(detail)}</div>` : ''}`;
     box.style.display = 'block';
 
     clearTimeout(window._eggsNotifTimer);
@@ -1456,14 +1514,36 @@ function notifyPostActivity(title, detail = '') {
 
 window.notifyPostActivity = notifyPostActivity;
 
+function extractCleanHandle(raw) {
+    if (!raw || typeof raw !== 'string') return '';
+    const trimmed = raw.trim().replace(/^@+/, '');
+    if (!trimmed || trimmed.length > 30 || /\s/.test(trimmed)) return '';
+    return normalizeHandle(trimmed);
+}
+
 function processFeedNotifications(data) {
-    const myHandle = typeof getMyHandle === 'function' ? normalizeHandle(getMyHandle()) : '';
+    ensureNotificationUI();
+    const myHandle = typeof getMyHandle === 'function' ? extractCleanHandle(getMyHandle()) : '';
     const postsObj = data && typeof data === 'object' ? data : {};
 
     for (const [postId, post] of Object.entries(postsObj)) {
         if (!post || typeof post !== 'object') continue;
 
-        const postAuthor = normalizeHandle(post.author || post.handle || post.user || '');
+        const postAuthor = extractCleanHandle(post.author || post.handle || post.user || '');
+        const sharedBy = extractCleanHandle(post.sharedBy || post.repostedBy || post.sharer || '');
+        const originalAuthor = extractCleanHandle(post.originalAuthor || post.parentAuthor || '');
+
+        // Detectar post compartido como nueva entrada en el feed
+        if (!isInitialFeedSnapshot && !prevPostEngagement.has(postId)) {
+            if (myHandle && originalAuthor === myHandle && sharedBy && sharedBy !== myHandle) {
+                notifyPostActivity(
+                    `@${sharedBy} compartió tu publicación`,
+                    post.text || 'Publicación en Eggs'
+                );
+            }
+        }
+
+        // Likes
         const likesRaw = post.likes;
         const likesCount = Array.isArray(likesRaw)
             ? likesRaw.filter(Boolean).length
@@ -1476,24 +1556,28 @@ function processFeedNotifications(data) {
             ? likesRaw
                 .map((val, idx) => {
                     if (!val) return null;
-                    const key = typeof val === 'string' ? normalizeHandle(val) : `idx_${idx}`;
                     const handle = typeof val === 'string'
-                        ? normalizeHandle(val)
-                        : normalizeHandle(val.author || val.handle || val.user || val.name || '');
-                    return { key, handle };
+                        ? extractCleanHandle(val)
+                        : extractCleanHandle(val.author || val.handle || val.user || val.name || '');
+                    return { key: handle || `idx_${idx}`, handle };
                 })
                 .filter(Boolean)
             : Object.entries(likesObj)
                 .filter(([, val]) => Boolean(val))
                 .map(([key, val]) => {
-                    const handle = typeof val === 'object' && val !== null
-                        ? normalizeHandle(val.author || val.handle || val.user || val.name || key)
-                        : normalizeHandle(key);
-                    return { key: normalizeHandle(key) || key, handle };
+                    const fromVal = typeof val === 'object' && val !== null
+                        ? extractCleanHandle(val.author || val.handle || val.user || val.name || '')
+                        : typeof val === 'string'
+                            ? extractCleanHandle(val)
+                            : '';
+                    const fromKey = extractCleanHandle(key);
+                    const handle = fromVal || fromKey;
+                    return { key: handle || key, handle };
                 });
 
         const likeKeys = new Set(likeEntries.map((item) => item.key));
 
+        // Shares por contador u objeto dentro del post
         const sharesRaw = post.shares;
         const sharesCount = Array.isArray(sharesRaw)
             ? sharesRaw.filter(Boolean).length
@@ -1501,7 +1585,12 @@ function processFeedNotifications(data) {
                 ? Object.values(sharesRaw).filter(Boolean).length
                 : Number(sharesRaw) || 0;
 
-        const commentsObj = post.comments && typeof post.comments === 'object' ? post.comments : {};
+        // Comentarios / Respuestas (soporta post.comments y post.replies)
+        const commentsObj = (post.comments && typeof post.comments === 'object')
+            ? post.comments
+            : (post.replies && typeof post.replies === 'object')
+                ? post.replies
+                : {};
         const commentIds = new Set(Object.keys(commentsObj));
 
         const prev = prevPostEngagement.get(postId);
@@ -1511,10 +1600,6 @@ function processFeedNotifications(data) {
                 .filter((item) => !(prev.likeKeys && prev.likeKeys.has(item.key)))
                 .map((item) => item.handle)
                 .filter((handle) => handle && handle !== myHandle);
-
-            if (likesCount > prev.likesCount && newLikers.length === 0) {
-                console.log("Estructura real de post.likes:", post.likes, "likeEntries:", likeEntries);
-            }
 
             if (newLikers.length > 0) {
                 const uniqueLikers = [...new Set(newLikers)];
@@ -1541,10 +1626,10 @@ function processFeedNotifications(data) {
             for (const commentId of commentIds) {
                 if (!prev.commentIds.has(commentId)) {
                     const comment = commentsObj[commentId] || {};
-                    const commenter = normalizeHandle(comment.author || comment.handle || comment.sender || '');
+                    const commenter = extractCleanHandle(comment.author || comment.handle || comment.sender || comment.user || '');
                     if (commenter && commenter !== myHandle) {
                         notifyPostActivity(
-                            `@${commenter} comentó en tu publicación`,
+                            `@${commenter} respondió a tu publicación`,
                             comment.text || post.text || 'Nuevo comentario'
                         );
                     }
