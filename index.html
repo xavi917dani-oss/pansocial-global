@@ -690,48 +690,6 @@ function unhidePrivateChatForMe(partnerHandle) {
     }
 }
 
-    allPrivateChatsData = chatsData && typeof chatsData === 'object' ? chatsData : {};
-    const myHandle = getMyHandle();
-
-    let changed = false;
-    for (const [pairId, pairObj] of Object.entries(allPrivateChatsData)) {
-        const parts = pairId.split('__');
-        if (parts.length !== 2) continue;
-        const [u1, u2] = parts;
-        if (u1 !== myHandle && u2 !== myHandle) continue;
-
-        const peerHandle = u1 === myHandle ? u2 : u1;
-        recentPeers.add(peerHandle);
-
-        const msgsObj = pairObj && pairObj.messages && typeof pairObj.messages === 'object' ? pairObj.messages : {};
-        for (const [msgId, msg] of Object.entries(msgsObj)) {
-            if (!msg) continue;
-            const senderHandle = normalizeHandle(msg.sender);
-            if (!senderHandle || senderHandle === myHandle) continue;
-
-            const uniqueKey = `${pairId}/${msgId}`;
-            const isViewingThisDmNow = activeTab === 'chat' && chatMode === 'dm' && currentPrivateTarget === peerHandle;
-            const msgTime = Number(msg.timestamp || 0);
-
-            if (msgTime >= sessionStartTime - 1500 && !notifiedMessageKeys.has(uniqueKey)) {
-                notifiedMessageKeys.add(uniqueKey);
-                unhidePrivateChatForMe(peerHandle); // Si te vuelve a escribir, vuelve a mostrarse
-                if (!isViewingThisDmNow) {
-                    unreadByPeer.set(peerHandle, (unreadByPeer.get(peerHandle) || 0) + 1);
-                    changed = true;
-                    showPrivateNotification(senderHandle, msg.text, msg.lang);
-                }
-            }
-        }
-    }
-
-    if (changed) {
-        refreshUnreadBadges();
-    } else {
-        renderDmShortcuts();
-    }
-}
-
 function processPrivateChatsNotifications(chatsData) {
     allPrivateChatsData = chatsData && typeof chatsData === 'object' ? chatsData : {};
     const myHandle = normalizeHandle(getMyHandle());
