@@ -1415,24 +1415,38 @@ function subscribeToAllPrivateChats() {
 let isInitialFeedSnapshot = true;
 
 function notifyPostActivity(title, detail = '') {
-    if (typeof showPrivateNotification === 'function') {
-        showPrivateNotification(title, detail, 'es');
+    let box = document.getElementById('eggsNotifToast');
+    if (!box) {
+        box = document.createElement('div');
+        box.id = 'eggsNotifToast';
+        box.style.cssText = [
+            'position:fixed',
+            'top:16px',
+            'right:16px',
+            'z-index:99999',
+            'background:#18181b',
+            'color:#ffffff',
+            'border:1px solid rgba(255,255,255,0.15)',
+            'padding:12px 16px',
+            'border-radius:12px',
+            'box-shadow:0 10px 25px rgba(0,0,0,0.4)',
+            'font-family:system-ui,-apple-system,sans-serif',
+            'font-size:14px',
+            'max-width:320px',
+            'line-height:1.35',
+            'display:none'
+        ].join(';');
+        document.body.appendChild(box);
     }
-    if (typeof showToast === 'function') {
-        showToast(`${title}${detail ? ': ' + detail : ''}`);
-        return;
-    }
-    const el = document.getElementById('toastBanner') || document.querySelector('.toast-banner, .notification-toast');
-    if (el) {
-        el.textContent = detail ? `${title} — ${detail}` : title;
-        el.classList.add('show', 'active', 'visible');
-        clearTimeout(window._eggsToastTimer);
-        window._eggsToastTimer = setTimeout(() => {
-            el.classList.remove('show', 'active', 'visible');
-        }, 4000);
-    }
-}
 
+    box.innerHTML = `<div style="font-weight:700;margin-bottom:3px;">${title}</div>${detail ? `<div style="font-size:12px;opacity:0.85;">${detail}</div>` : ''}`;
+    box.style.display = 'block';
+
+    clearTimeout(window._eggsNotifTimer);
+    window._eggsNotifTimer = setTimeout(() => {
+        box.style.display = 'none';
+    }, 4500);
+}
 function processFeedNotifications(postsData) {
     const myHandle = normalizeHandle(getMyHandle());
     const postsObj = postsData && typeof postsData === 'object' ? postsData : {};
