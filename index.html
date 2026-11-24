@@ -1411,7 +1411,7 @@ function subscribeToAllPrivateChats() {
         });
     }
 
-    const prevPostEngagement = new Map();
+const prevPostEngagement = new Map();
 let isInitialFeedSnapshot = true;
 
 function notifyPostActivity(title, detail = '') {
@@ -1456,22 +1456,58 @@ function notifyPostActivity(title, detail = '') {
 
 window.notifyPostActivity = notifyPostActivity;
 
+function processFeedNotifications(data) {
+    const myHandle = typeof getMyHandle === 'function' ? normalizeHandle(getMyHandle()) : '';
+    const postsObj = data && typeof data === 'object' ? data : {};
+
+    for (const [postId, post] of Object.entries(postsObj)) {
+        if (!post || typeof post !== 'object') continue;
+
+        const postAuthor = normalizeHandle(post.author || post.handle || post.user || '');
+        const likesRaw = post.likes;
+        const likesCount = Array.isArray(likesRaw)
+            ? likesRaw.filter(Boolean).length
+            : likesRaw && typeof likesRaw === 'object'
+                ? Object.values(likesRaw).filter(Boolean).length
+                : Number(likesRaw) || 0;
+
+        const sharesRaw = post.shares;
+        const sharesCount = Array.isArray(sharesRaw)
+            ? sharesRaw.filter(Boolean).length
+            : sharesRaw && typeof sharesRaw === 'object'
+                ? Object.values(sharesRaw).filter(Boolean).length
+                : Number(sharesRaw) || 0;
+
+        const commentsObj = post.comments && typeof post.comments === 'object' ? post.comments : {};
+        const commentIds = new Set(Object.keys(commentsObj));
+
+        const prev = prevPostEngagement.get(postId);
+
+        if (!isInitialFeedSnapshot && prev && myHandle && postAuthor === myHandle) {
+            if (likesCount > prev.likesCount) {
+                const diff = likesCount - prev.likesCount;
+                notifyPostActivity(
+                    diff > 1 ? `Alguien dio ${diff} me gusta a tu publicación` : 'A alguien le gustó tu publicación',
+                    post.text || 'Publicación en Eggs'
+                );
+            }
+
             if (sharesCount > prev.sharesCount) {
                 const diff = sharesCount - prev.sharesCount;
                 notifyPostActivity(
-                    diff > 1 ? `Tu publicación se compartió ${diff} veces` : "Alguien compartió tu publicación",
-                    post.text || "Publicación en Eggs"
+                    diff > 1 ? `Tu publicación se compartió ${diff} veces` : 'Alguien compartió tu publicación',
+                    post.text || 'Publicación en Eggs'
                 );
             }
 
             for (const commentId of commentIds) {
                 if (!prev.commentIds.has(commentId)) {
                     const comment = commentsObj[commentId] || {};
-                    const commenter = normalizeHandle(comment.author || comment.handle || comment.sender);
+                    const commenter = normalizeHandle(comment.author || comment.handle || comment.sender || '');
                     if (commenter && commenter !== myHandle) {
                         notifyPostActivity(
                             `@${commenter} comentó en tu publicación`,
-                            comment.text || post.text || "Nuevo comentario"
+                            comment.text || post.text || 'Nuevo comentario'
                         );
                     }
                 }
@@ -1487,18 +1523,20 @@ window.notifyPostActivity = notifyPostActivity;
 
     isInitialFeedSnapshot = false;
 }
-    function subscribeToFeed() {
-        const postsRef = ref(db, 'feed/posts');
-        onValue(postsRef, async (snapshot) => {
-            const data = snapshot.val();
-            latestPosts = data
-                ? Object.entries(data).map(([id, value]) => ({ id, ...value }))
-                : [];
-            if (activeTab === 'feed' || activeTab === 'profile') {
-                await refreshActiveView();
-            }
-        });
-    }
+
+function subscribeToFeed() {
+    const postsRef = ref(db, 'feed/posts');
+    onValue(postsRef, async (snapshot) => {
+        const data = snapshot.val();
+        processFeedNotifications(data);
+        latestPosts = data
+            ? Object.entries(data).map(([id, value]) => ({ id, ...value }))
+            : [];
+        if (activeTab === 'feed' || activeTab === 'profile') {
+            await refreshActiveView();
+        }
+    });
+}
 
     function subscribeToProfiles() {
         const profilesRef = ref(db, 'profiles');
