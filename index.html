@@ -1464,7 +1464,7 @@ function processFeedNotifications(data) {
         if (!post || typeof post !== 'object') continue;
 
         const postAuthor = normalizeHandle(post.author || post.handle || post.user || '');
-   const likesRaw = post.likes;
+        const likesRaw = post.likes;
         const likesCount = Array.isArray(likesRaw)
             ? likesRaw.filter(Boolean).length
             : likesRaw && typeof likesRaw === 'object'
@@ -1508,11 +1508,11 @@ function processFeedNotifications(data) {
 
         if (!isInitialFeedSnapshot && prev && myHandle && postAuthor === myHandle) {
             const newLikers = likeEntries
-                .filter((item) => !prev.likeKeys.has(item.key))
+                .filter((item) => !(prev.likeKeys && prev.likeKeys.has(item.key)))
                 .map((item) => item.handle)
                 .filter((handle) => handle && handle !== myHandle);
 
-           if (likesCount > prev.likesCount && newLikers.length === 0) {
+            if (likesCount > prev.likesCount && newLikers.length === 0) {
                 console.log("Estructura real de post.likes:", post.likes, "likeEntries:", likeEntries);
             }
 
@@ -1529,7 +1529,7 @@ function processFeedNotifications(data) {
                     post.text || 'Publicación en Eggs'
                 );
             }
-            
+
             if (sharesCount > prev.sharesCount) {
                 const diff = sharesCount - prev.sharesCount;
                 notifyPostActivity(
@@ -1550,9 +1550,6 @@ function processFeedNotifications(data) {
                     }
                 }
             }
-        }
-
-        // ... aquí van los if de newLikers, sharesCount y commentIds ...
         }
 
         prevPostEngagement.set(postId, {
