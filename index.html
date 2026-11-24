@@ -605,22 +605,35 @@
         renderDmShortcuts();
     }
 
-    function renderDmShortcuts() {
-        if (!recentPeers.size) {
-            dmShortcuts.innerHTML = '';
-            return;
-        }
-        let html = '<span style="font-size:0.72rem;color:#9ea0b8;align-self:center;">Conversaciones:</span>';
-        for (const peer of recentPeers) {
-            const count = unreadByPeer.get(peer) || 0;
-            html += `
-                <button type="button" class="dm-chip ${count > 0 ? 'unread' : ''}" onclick="startDirectChatWith('${escapeHtml(peer)}')">
-                    ${renderAvatarTag(peer, 'chat-avatar')} @${escapeHtml(peer)} ${count > 0 ? `(${count})` : ''}
-                </button>
-            `;
-        }
-        dmShortcuts.innerHTML = html;
+    window.hidePrivateChatForMe = hidePrivateChatForMe;
+
+function renderDmShortcuts() {
+    const hiddenChats = getHiddenPrivateChats();
+    const visiblePeers = [...recentPeers].filter(p => !hiddenChats.has(normalizeHandle(p)));
+
+    if (!visiblePeers.length) {
+        dmShortcuts.innerHTML = '';
+        return;
     }
+
+    let html = '<span style="font-size:0.72rem;color:#9ea0b8;align-self:center;">Conversaciones:</span>';
+    for (const peer of visiblePeers) {
+        const cleanPeer = normalizeHandle(peer);
+        const count = unreadByPeer.get(cleanPeer) || 0;
+        const safePeerAttr = escapeHtml(cleanPeer);
+
+        html += `
+            <span class="dm-chip ${count > 0 ? 'unread' : ''}" style="display:inline-flex;align-items:center;gap:6px;">
+                <span onclick="startDirectChatWith('${safePeerAttr}')" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
+                    ${renderAvatarTag(cleanPeer, 'chat-avatar')} @${safePeerAttr} ${count > 0 ? `(${count})` : ''}
+                </span>
+                <button type="button" title="Ocultar conversación" onclick="event.stopPropagation(); window.hidePrivateChatForMe('${safePeerAttr}')" style="background:none;border:none;color:inherit;opacity:0.75;cursor:pointer;font-size:0.9rem;line-height:1;padding:0 2px;">×</button>
+            </span>
+        `;
+    }
+
+    dmShortcuts.innerHTML = html;
+}
 
     window.dismissToast = function() {
         toastBanner.classList.remove('show');
@@ -640,54 +653,92 @@
         playNotificationTone();
     }
 
-    function processPrivateChatsNotifications(chatsData) {
-        allPrivateChatsData = chatsData && typeof chatsData === 'object' ? chatsData : {};
-        const myHandle = getMyHandle();
+   // --- Ocultar conversaciones privadas de tu lista sin borrarlas para el otro usuario ---
+function getHiddenChatsKey() {
+    const me = normalizeHandle(getMyHandle() || 'guest');
+    return `hiddenPrivateChats_${me}`;
+}
 
-        let changed = false;
-        for (const [pairId, pairObj] of Object.entries(allPrivateChatsData)) {
-            const parts = pairId.split('__');
-            if (parts.length !== 2) continue;
-            const [u1, u2] = parts;
-            if (u1 !== myHandle && u2 !== myHandle) continue;
+function getHiddenPrivateChats() {
+    try {
+        return new Set(JSON.parse(localStorage.getItem(getHiddenChatsKey()) || '[]'));
+    } catch {
+        return new Set();
+    }
+}
 
-            const peerHandle = u1 === myHandle ? u2 : u1;
-            recentPeers.add(peerHandle);
+function hidePrivateChatForMe(partnerHandle) {
+    const clean = normalizeHandle(partnerHandle);
+    if (!clean) return;
+    const hidden = getHiddenPrivateChats();
+    hidden.add(clean);
+    localStorage.setItem(getHiddenChatsKey(), JSON.stringify([...hidden]));
 
-            const msgsObj = pairObj && pairObj.messages && typeof pairObj.messages === 'object' ? pairObj.messages : {};
-            for (const [msgId, msg] of Object.entries(msgsObj)) {
-                if (!msg) continue;
-                const senderHandle = normalizeHandle(msg.sender);
-                if (!senderHandle || senderHandle === myHandle) continue;
+    if (typeof currentPrivateTarget !== 'undefined' && normalizeHandle(currentPrivateTarget) === clean) {
+        currentPrivateTarget = '';
+        if (typeof messagesDiv !== 'undefined' && messagesDiv) messagesDiv.innerHTML = '';
+    }
+    if (typeof renderDmShortcuts === 'function') renderDmShortcuts();
+}
 
-                const uniqueKey = `${pairId}/${msgId}`;
-                const isViewingThisDmNow = activeTab === 'chat' && chatMode === 'dm' && currentPrivateTarget === peerHandle;
-                const msgTime = Number(msg.timestamp || 0);
+function unhidePrivateChatForMe(partnerHandle) {
+    const clean = normalizeHandle(partnerHandle);
+    if (!clean) return;
+    const hidden = getHiddenPrivateChats();
+    if (hidden.delete(clean)) {
+        localStorage.setItem(getHiddenChatsKey(), JSON.stringify([...hidden]));
+    }
+}
 
-                if (msgTime >= sessionStartTime - 1500 && !notifiedMessageKeys.has(uniqueKey)) {
-                    notifiedMessageKeys.add(uniqueKey);
-                    if (!isViewingThisDmNow) {
-                        unreadByPeer.set(peerHandle, (unreadByPeer.get(peerHandle) || 0) + 1);
-                        changed = true;
-                        showPrivateNotification(senderHandle, msg.text, msg.lang);
-                    }
+function processPrivateChatsNotifications(chatsData) {
+    allPrivateChatsData = chatsData && typeof chatsData === 'object' ? chatsData : {};
+    const myHandle = getMyHandle();
+
+    let changed = false;
+    for (const [pairId, pairObj] of Object.entries(allPrivateChatsData)) {
+        const parts = pairId.split('__');
+        if (parts.length !== 2) continue;
+        const [u1, u2] = parts;
+        if (u1 !== myHandle && u2 !== myHandle) continue;
+
+        const peerHandle = u1 === myHandle ? u2 : u1;
+        recentPeers.add(peerHandle);
+
+        const msgsObj = pairObj && pairObj.messages && typeof pairObj.messages === 'object' ? pairObj.messages : {};
+        for (const [msgId, msg] of Object.entries(msgsObj)) {
+            if (!msg) continue;
+            const senderHandle = normalizeHandle(msg.sender);
+            if (!senderHandle || senderHandle === myHandle) continue;
+
+            const uniqueKey = `${pairId}/${msgId}`;
+            const isViewingThisDmNow = activeTab === 'chat' && chatMode === 'dm' && currentPrivateTarget === peerHandle;
+            const msgTime = Number(msg.timestamp || 0);
+
+            if (msgTime >= sessionStartTime - 1500 && !notifiedMessageKeys.has(uniqueKey)) {
+                notifiedMessageKeys.add(uniqueKey);
+                unhidePrivateChatForMe(peerHandle); // Si te vuelve a escribir, vuelve a mostrarse
+                if (!isViewingThisDmNow) {
+                    unreadByPeer.set(peerHandle, (unreadByPeer.get(peerHandle) || 0) + 1);
+                    changed = true;
+                    showPrivateNotification(senderHandle, msg.text, msg.lang);
                 }
             }
         }
-
-        if (changed) {
-            refreshUnreadBadges();
-        } else {
-            renderDmShortcuts();
-        }
     }
 
-    function subscribeToAllPrivateChats() {
-        const privateRef = ref(db, 'privateChats');
-        onValue(privateRef, (snapshot) => {
-            processPrivateChatsNotifications(snapshot.val());
-        });
+    if (changed) {
+        refreshUnreadBadges();
+    } else {
+        renderDmShortcuts();
     }
+}
+
+function subscribeToAllPrivateChats() {
+    const privateRef = ref(db, 'privateChats');
+    onValue(privateRef, (snapshot) => {
+        processPrivateChatsNotifications(snapshot.val());
+    });
+}
 
     function compressImageFile(file, maxWidth = 700, quality = 0.72) {
         return new Promise((resolve, reject) => {
@@ -1431,8 +1482,7 @@
             connectPrivateChat();
         }
     };
-
-    window.connectPrivateChat = function() {
+window.connectPrivateChat = function() {
         const myHandle = getMyHandle();
         const targetHandle = normalizeHandle(targetUserInput.value);
 
@@ -1450,6 +1500,9 @@
         chatMode = 'dm';
         currentPrivateTarget = targetHandle;
         recentPeers.add(targetHandle);
+        if (typeof unhidePrivateChatForMe === 'function') {
+            unhidePrivateChatForMe(targetHandle);
+        }
         if (unreadByPeer.has(targetHandle)) {
             unreadByPeer.delete(targetHandle);
             refreshUnreadBadges();
