@@ -1414,7 +1414,48 @@ function subscribeToAllPrivateChats() {
 const prevPostEngagement = new Map();
 let isInitialFeedSnapshot = true;
 const eggsNotificationsHistory = [];
+async function goToNotifiedPost(postId) {
+    if (!postId) return;
 
+    const panel = document.getElementById('eggsNotifPanel');
+    if (panel) panel.style.display = 'none';
+
+    if (typeof activeTab !== 'undefined' && activeTab !== 'feed') {
+        const feedTabBtn = document.querySelector('[data-tab="feed"], #tabFeed, button[onclick*="feed"]');
+        if (feedTabBtn) {
+            feedTabBtn.click();
+        } else if (typeof switchTab === 'function') {
+            await switchTab('feed');
+        }
+    }
+
+    setTimeout(() => {
+        const selectors = [
+            `[data-post-id="${postId}"]`,
+            `#post-${postId}`,
+            `#${CSS.escape(postId)}`
+        ];
+        let targetEl = null;
+        for (const sel of selectors) {
+            targetEl = document.querySelector(sel);
+            if (targetEl) break;
+        }
+
+        if (targetEl) {
+            targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const prevOutline = targetEl.style.outline;
+            const prevTransition = targetEl.style.transition;
+            targetEl.style.transition = 'outline 0.25s ease';
+            targetEl.style.outline = '2px solid #facc15';
+            setTimeout(() => {
+                targetEl.style.outline = prevOutline;
+                targetEl.style.transition = prevTransition;
+            }, 2200);
+        }
+    }, 180);
+}
+
+window.goToNotifiedPost = goToNotifiedPost;
 function ensureNotificationUI() {
     if (!document.getElementById('eggsNotifBellWrap')) {
         const wrap = document.createElement('div');
