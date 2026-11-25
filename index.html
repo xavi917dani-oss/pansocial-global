@@ -1415,6 +1415,7 @@ function subscribeToAllPrivateChats() {
 const prevPostEngagement = new Map();
 let isInitialFeedSnapshot = true;
 const eggsNotificationsHistory = [];
+window.eggsNotificationsHistory = eggsNotificationsHistory;
 async function goToNotifiedPost(postId) {
     if (!postId) return;
 
