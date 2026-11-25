@@ -336,6 +336,7 @@
     let allPrivateChatsData = {};
     let profilesMap = {};
     let followingSet = new Set();
+    let allFollowingData = {};
     let followingRefCurrent = null;
     let openReplyPostIds = new Set();
     let editingPostId = null;
@@ -1718,7 +1719,7 @@ let knownFollowersSet = new Set();
  let isInitialFollowersSnapshot = true;
  let followersWatchHandle = '';
 
- function subscribeToFollowersNotifications() {
+ async function subscribeToFollowersNotifications() {
      const allFollowingRef = ref(db, 'following');
      onValue(allFollowingRef, (snapshot) => {
          const myHandle = getMyHandle();
@@ -1758,6 +1759,12 @@ let knownFollowersSet = new Set();
          isInitialFollowersSnapshot = false;
      });
  }
+   const allData = snapshot.val() || {};
+            allFollowingData = allData;
+            if (activeTab === 'profile') {
+                await renderProfileView();
+            }
+            const currentFollowers = new Set();
     window.changeRoom = function(btn, roomName) {
         chatMode = 'room';
         currentRoom = roomName;
