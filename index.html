@@ -336,7 +336,7 @@
         showFollowersList = !showFollowersList;
         renderProfileView();
     };
-
+    
     let selectedPostImage = '';
     let latestMessages = [];
     let latestPosts = [];
@@ -1100,6 +1100,14 @@
         }).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
         const photosCount = userPosts.filter(p => Boolean(p.imageUrl)).length;
+        const followersList = Object.entries(allFollowingData || {})
+            .filter(([followerRaw, targetsObj]) => {
+                const follower = normalizeHandle(followerRaw);
+                return follower && follower !== targetHandle && targetsObj && typeof targetsObj === 'object' && Boolean(targetsObj[targetHandle]);
+            })
+            .map(([followerRaw]) => normalizeHandle(followerRaw));
+        const followersCount = followersList.length;
+        currentProfileFollowers = followersList;
 
         profileContentBox.innerHTML = '';
 
@@ -1114,6 +1122,7 @@
                     <div class="profile-handle">@${escapeHtml(targetHandle)} ${isMyProfile ? '<span class="edited-tag">(Tú)</span>' : ''}</div>
                     <div class="profile-bio">${displayBio ? escapeHtml(displayBio) : '<span style="color:#8b8ea6;">Sin biografía todavía.</span>'}</div>
                     <div class="profile-stats">
+                        <button type="button" class="mini-btn" onclick="toggleFollowersList()">👥 ${followersCount} seguidores</button>
                         <span>📝 ${userPosts.length} publicaciones</span>
                         <span>🖼️ ${photosCount} fotos</span>
                     </div>
@@ -1137,22 +1146,24 @@
         `;
         profileContentBox.appendChild(headerCard);
 
-        const divider = document.createElement('div');
-        divider.className = 'section-divider';
-        divider.textContent = `Ideas e imágenes publicadas por @${targetHandle}`;
-        profileContentBox.appendChild(divider);
-
-        if (!userPosts.length) {
-            const emptyCard = document.createElement('div');
-            emptyCard.className = 'post-card';
-            emptyCard.innerHTML = `<div class="post-body">@${escapeHtml(targetHandle)} aún no ha publicado ideas ni imágenes.</div>`;
-            profileContentBox.appendChild(emptyCard);
-            return;
-        }
-
-        for (const post of userPosts) {
-            const card = await createPostCardElement(post);
-            profileContentBox.appendChild(card);
+        if (showFollowersList) {
+            const followersCard = document.createElement('div');
+            followersCard.className = 'post-card';
+            if (!currentProfileFollowers.length) {
+                followersCard.innerHTML = `<div class="post-body">Aún no hay seguidores para @${escapeHtml(targetHandle)}.</div>`;
+            } else {
+                const itemsHtml = currentProfileFollowers.map((follower) => `
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 4px;border-bottom:1px solid #363645;">
+                        <span class="user-link" onclick="showFollowersList=false; openUserProfile('${escapeHtml(follower)}')" title="Ver perfil de @${escapeHtml(follower)}">
+                            ${renderAvatarTag(follower, 'chat-avatar')}
+                            <span>@${escapeHtml(follower)}</span>
+                        </span>
+                        ${renderFollowButtonHtml(follower)}
+                    </div>
+                `).join('');
+                followersCard.innerHTML = `<div style="font-weight:bold;color:#00d4ff;margin-bottom:4px;">Seguidores de @${escapeHtml(targetHandle)} (${currentProfileFollowers.length})</div>${itemsHtml}`;
+            }
+            profileContentBox.appendChild(followersCard);
         }
     }
 
