@@ -1458,7 +1458,8 @@ async function goToNotifiedPost(postId) {
 }
 
 window.goToNotifiedPost = goToNotifiedPost;
-function ensureNotificationUI() {
+
+function processFeedNotifications(data) {
     if (!document.getElementById('eggsNotifBellWrap')) {
         const wrap = document.createElement('div');
         wrap.id = 'eggsNotifBellWrap';
