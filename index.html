@@ -329,6 +329,13 @@
     let currentDbPath = 'rooms/General/messages';
     let currentChatRef = null;
     let viewedProfileHandle = '';
+    let currentProfileFollowers = [];
+    let showFollowersList = false;
+
+    window.toggleFollowersList = function() {
+        showFollowersList = !showFollowersList;
+        renderProfileView();
+    };
 
     let selectedPostImage = '';
     let latestMessages = [];
@@ -1716,49 +1723,54 @@
         });
     }
 let knownFollowersSet = new Set();
- let isInitialFollowersSnapshot = true;
- let followersWatchHandle = '';
+    let isInitialFollowersSnapshot = true;
+    let followersWatchHandle = '';
 
- async function subscribeToFollowersNotifications() {
-     const allFollowingRef = ref(db, 'following');
-     onValue(allFollowingRef, (snapshot) => {
-         const myHandle = getMyHandle();
-         if (!myHandle || myHandle === 'usuario') return;
+    function subscribeToFollowersNotifications() {
+        const allFollowingRef = ref(db, 'following');
+        onValue(allFollowingRef, async (snapshot) => {
+            const myHandle = getMyHandle();
+            if (!myHandle || myHandle === 'usuario') return;
 
-         if (followersWatchHandle !== myHandle) {
-             followersWatchHandle = myHandle;
-             knownFollowersSet = new Set();
-             isInitialFollowersSnapshot = true;
-         }
+            if (followersWatchHandle !== myHandle) {
+                followersWatchHandle = myHandle;
+                knownFollowersSet = new Set();
+                isInitialFollowersSnapshot = true;
+            }
 
-         const allData = snapshot.val() || {};
-         const currentFollowers = new Set();
+            const allData = snapshot.val() || {};
+            allFollowingData = allData;
+            if (activeTab === 'profile') {
+                await renderProfileView();
+            }
 
-         for (const [followerRaw, targetsObj] of Object.entries(allData)) {
-             const follower = normalizeHandle(followerRaw);
-             if (!follower || follower === myHandle) continue;
-             if (targetsObj && typeof targetsObj === 'object' && Boolean(targetsObj[myHandle])) {
-                 currentFollowers.add(follower);
-             }
-         }
+            const currentFollowers = new Set();
 
-         if (!isInitialFollowersSnapshot) {
-             for (const follower of currentFollowers) {
-                 if (!knownFollowersSet.has(follower)) {
-                     notifyPostActivity(
-                         `@${follower} comenzó a seguirte`,
-                         'Toca para ver su perfil en Egg',
-                         '',
-                         follower
-                     );
-                 }
-             }
-         }
+            for (const [followerRaw, targetsObj] of Object.entries(allData)) {
+                const follower = normalizeHandle(followerRaw);
+                if (!follower || follower === myHandle) continue;
+                if (targetsObj && typeof targetsObj === 'object' && Boolean(targetsObj[myHandle])) {
+                    currentFollowers.add(follower);
+                }
+            }
 
-         knownFollowersSet = currentFollowers;
-         isInitialFollowersSnapshot = false;
-     });
- }
+            if (!isInitialFollowersSnapshot) {
+                for (const follower of currentFollowers) {
+                    if (!knownFollowersSet.has(follower)) {
+                        notifyPostActivity(
+                            `@${follower} comenzó a seguirte`,
+                            'Toca para ver su perfil en Egg',
+                            '',
+                            follower
+                        );
+                    }
+                }
+            }
+
+            knownFollowersSet = currentFollowers;
+            isInitialFollowersSnapshot = false;
+        });
+    }
    const allData = snapshot.val() || {};
             allFollowingData = allData;
             if (activeTab === 'profile') {
