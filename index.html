@@ -1738,14 +1738,6 @@ let knownFollowersSet = new Set();
                 isInitialFollowersSnapshot = true;
             }
 
-            const allData = snapshot.val() || {};
-            allFollowingData = allData;
-            if (activeTab === 'profile') {
-                await renderProfileView();
-            }
-
-            const currentFollowers = new Set();
-
             for (const [followerRaw, targetsObj] of Object.entries(allData)) {
                 const follower = normalizeHandle(followerRaw);
                 if (!follower || follower === myHandle) continue;
