@@ -1187,25 +1187,24 @@ window.toggleFollowingList = function() {
         }
 
 
-        if (showFollowersList) {
-            const followersCard = document.createElement('div');
-            followersCard.className = 'post-card';
-            if (!currentProfileFollowers.length) {
-                followersCard.innerHTML = `<div class="post-body">Aún no hay seguidores para @${escapeHtml(targetHandle)}.</div>`;
-            } else {
-                const itemsHtml = currentProfileFollowers.map((follower) => `
-                    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 4px;border-bottom:1px solid #363645;">
-                        <span class="user-link" onclick="showFollowersList=false; openUserProfile('${escapeHtml(follower)}')" title="Ver perfil de @${escapeHtml(follower)}">
-                            ${renderAvatarTag(follower, 'chat-avatar')}
-                            <span>@${escapeHtml(follower)}</span>
-                        </span>
-                        ${renderFollowButtonHtml(follower)}
-                    </div>
-                `).join('');
-                followersCard.innerHTML = `<div style="font-weight:bold;color:#00d4ff;margin-bottom:4px;">Seguidores de @${escapeHtml(targetHandle)} (${currentProfileFollowers.length})</div>${itemsHtml}`;
-            }
-            profileContentBox.appendChild(followersCard);
+        if (showFollowingList) {
+        const followingCard = document.createElement('div');
+        followingCard.className = 'post-card';
+        if (!currentProfileFollowing.length) {
+            followingCard.innerHTML = `<div class="post-body">@${escapeHtml(targetHandle)} aún no sigue a nadie.</div>`;
+        } else {
+            const itemsHtml = currentProfileFollowing.map((followed) => `
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 4px;border-bottom:1px solid #363645;">
+                    <span class="user-link" onclick="showFollowersList=false; showFollowingList=false; openUserProfile('${escapeHtml(followed)}')" title="Ver perfil de @${escapeHtml(followed)}">
+                        ${renderAvatarTag(followed, 'chat-avatar')}
+                        <span>@${escapeHtml(followed)}</span>
+                    </span>
+                    ${renderFollowButtonHtml(followed)}
+                </div>
+            `).join('');
+            followingCard.innerHTML = `<div style="font-weight:bold;color:#00d4ff;margin-bottom:4px;">A quién sigue @${escapeHtml(targetHandle)} (${currentProfileFollowing.length})</div>${itemsHtml}`;
         }
+        profileContentBox.appendChild(followingCard);
     }
 
     window.startEditPost = function(postId) {
