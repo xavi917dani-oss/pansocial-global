@@ -1398,18 +1398,28 @@
             return;
         }
 
-        list.innerHTML = eggsNotificationsHistory.map((item) => `
-            <div data-goto-post="${escapeHtml(item.postId || '')}" style="background:#24242c;border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:8px 10px;cursor:${item.postId ? 'pointer' : 'default'};">
-                <div style="font-weight:600;color:#fff;margin-bottom:2px;">${escapeHtml(item.title)}</div>
-                <div style="color:#cbd5e1;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.detail || '')}</div>
-                <div style="color:#94a3b8;font-size:11px;margin-top:4px;">${escapeHtml(item.time || '')}</div>
-            </div>
-        `).join('');
+        list.innerHTML = eggsNotificationsHistory.map((item) => {
+            const clickable = Boolean(item.postId || item.profileHandle);
+            return `
+                <div data-goto-post="${escapeHtml(item.postId || '')}" data-goto-profile="${escapeHtml(item.profileHandle || '')}" style="background:#24242c;border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:8px 10px;cursor:${clickable ? 'pointer' : 'default'};">
+                    <div style="font-weight:600;color:#fff;margin-bottom:2px;">${escapeHtml(item.title)}</div>
+                    <div style="color:#cbd5e1;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.detail || '')}</div>
+                    <div style="color:#94a3b8;font-size:11px;margin-top:4px;">${escapeHtml(item.time || '')}</div>
+                </div>
+            `;
+        }).join('');
 
         list.querySelectorAll('[data-goto-post]').forEach((card) => {
             const pid = card.getAttribute('data-goto-post');
+            const prof = card.getAttribute('data-goto-profile');
             if (pid) {
                 card.addEventListener('click', () => goToNotifiedPost(pid));
+            } else if (prof) {
+                card.addEventListener('click', () => {
+                    const panel = document.getElementById('eggsNotifPanel');
+                    if (panel) panel.style.display = 'none';
+                    openUserProfile(prof);
+                });
             }
         });
     }
@@ -1458,13 +1468,14 @@
         }
     }
 
-    function notifyPostActivity(title, detail = '', postId = '') {
+    function notifyPostActivity(title, detail = '', postId = '', profileHandle = '') {
         ensureNotificationUI();
         const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         eggsNotificationsHistory.unshift({
             title,
             detail,
             postId: postId ? String(postId) : '',
+            profileHandle: profileHandle ? normalizeHandle(profileHandle) : '',
             time: nowTime
         });
         if (eggsNotificationsHistory.length > 30) {
