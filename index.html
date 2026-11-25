@@ -1204,6 +1204,7 @@ window.toggleFollowingList = function() {
                 followingCard.innerHTML = `<div style="font-weight:bold;color:#00d4ff;margin-bottom:4px;">A quién sigue @${escapeHtml(targetHandle)} (${currentProfileFollowing.length})</div>${itemsHtml}`;
             }
             profileContentBox.appendChild(followingCard);
+         }
         }
     window.startEditPost = function(postId) {
         editingPostId = postId;
