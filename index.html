@@ -1737,7 +1737,7 @@ let knownFollowersSet = new Set();
     let isInitialFollowersSnapshot = true;
     let followersWatchHandle = '';
 
-    function subscribeToFollowersNotifications() {
+ function subscribeToFollowersNotifications() {
         const allFollowingRef = ref(db, 'following');
         onValue(allFollowingRef, async (snapshot) => {
             const myHandle = getMyHandle();
