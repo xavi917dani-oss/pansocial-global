@@ -1782,12 +1782,7 @@ let knownFollowersSet = new Set();
             isInitialFollowersSnapshot = false;
         });
     }
-   const allData = snapshot.val() || {};
-            allFollowingData = allData;
-            if (activeTab === 'profile') {
-                await renderProfileView();
-            }
-            const currentFollowers = new Set();
+
     window.changeRoom = function(btn, roomName) {
         chatMode = 'room';
         currentRoom = roomName;
