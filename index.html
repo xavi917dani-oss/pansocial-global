@@ -329,13 +329,14 @@
     let currentDbPath = 'rooms/General/messages';
     let currentChatRef = null;
     let viewedProfileHandle = '';
-    let currentProfileFollowers = [];
-    let showFollowersList = false;
+    let currentProfileFollowing = [];
+let showFollowingList = false;
 
-    window.toggleFollowersList = function() {
-        showFollowersList = !showFollowersList;
-        renderProfileView();
-    };
+window.toggleFollowingList = function() {
+    showFollowingList = !showFollowingList;
+    showFollowersList = false;
+    renderProfileView();
+};
     
     let selectedPostImage = '';
     let latestMessages = [];
@@ -1100,6 +1101,7 @@
         }).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
         const photosCount = userPosts.filter(p => Boolean(p.imageUrl)).length;
+
         const followersList = Object.entries(allFollowingData || {})
             .filter(([followerRaw, targetsObj]) => {
                 const follower = normalizeHandle(followerRaw);
@@ -1108,6 +1110,15 @@
             .map(([followerRaw]) => normalizeHandle(followerRaw));
         const followersCount = followersList.length;
         currentProfileFollowers = followersList;
+
+        const followingTargetsObj = (allFollowingData && typeof allFollowingData[targetHandle] === 'object')
+            ? allFollowingData[targetHandle]
+            : {};
+        const followingList = Object.entries(followingTargetsObj)
+            .filter(([followedRaw, active]) => Boolean(active) && normalizeHandle(followedRaw) && normalizeHandle(followedRaw) !== targetHandle)
+            .map(([followedRaw]) => normalizeHandle(followedRaw));
+        const followingCount = followingList.length;
+        currentProfileFollowing = followingList;
 
         profileContentBox.innerHTML = '';
 
@@ -1123,6 +1134,7 @@
                     <div class="profile-bio">${displayBio ? escapeHtml(displayBio) : '<span style="color:#8b8ea6;">Sin biografía todavía.</span>'}</div>
                     <div class="profile-stats">
                         <button type="button" class="mini-btn" onclick="toggleFollowersList()">👥 ${followersCount} seguidores</button>
+                        <button type="button" class="mini-btn" onclick="toggleFollowingList()">➕ ${followingCount} siguiendo</button>
                         <span>📝 ${userPosts.length} publicaciones</span>
                         <span>🖼️ ${photosCount} fotos</span>
                     </div>
@@ -1145,6 +1157,47 @@
             `}
         `;
         profileContentBox.appendChild(headerCard);
+
+        if (showFollowersList) {
+            const followersCard = document.createElement('div');
+            followersCard.className = 'post-card';
+            if (!currentProfileFollowers.length) {
+                followersCard.innerHTML = `<div class="post-body">Aún no hay seguidores para @${escapeHtml(targetHandle)}.</div>`;
+            } else {
+                const itemsHtml = currentProfileFollowers.map((follower) => `
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 4px;border-bottom:1px solid #363645;">
+                        <span class="user-link" onclick="showFollowersList=false; showFollowingList=false; openUserProfile('${escapeHtml(follower)}')" title="Ver perfil de @${escapeHtml(follower)}">
+                            ${renderAvatarTag(follower, 'chat-avatar')}
+                            <span>@${escapeHtml(follower)}</span>
+                        </span>
+                        ${renderFollowButtonHtml(follower)}
+                    </div>
+                `).join('');
+                followersCard.innerHTML = `<div style="font-weight:bold;color:#00d4ff;margin-bottom:4px;">Seguidores de @${escapeHtml(targetHandle)} (${currentProfileFollowers.length})</div>${itemsHtml}`;
+            }
+            profileContentBox.appendChild(followersCard);
+        }
+
+        if (showFollowingList) {
+            const followingCard = document.createElement('div');
+            followingCard.className = 'post-card';
+            if (!currentProfileFollowing.length) {
+                followingCard.innerHTML = `<div class="post-body">@${escapeHtml(targetHandle)} aún no sigue a nadie.</div>`;
+            } else {
+                const itemsHtml = currentProfileFollowing.map((followed) => `
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 4px;border-bottom:1px solid #363645;">
+                        <span class="user-link" onclick="showFollowersList=false; showFollowingList=false; openUserProfile('${escapeHtml(followed)}')" title="Ver perfil de @${escapeHtml(followed)}">
+                            ${renderAvatarTag(followed, 'chat-avatar')}
+                            <span>@${escapeHtml(followed)}</span>
+                        </span>
+                        ${renderFollowButtonHtml(followed)}
+                    </div>
+                `).join('');
+                followingCard.innerHTML = `<div style="font-weight:bold;color:#00d4ff;margin-bottom:4px;">A quién sigue @${escapeHtml(targetHandle)} (${currentProfileFollowing.length})</div>${itemsHtml}`;
+            }
+            profileContentBox.appendChild(followingCard);
+        }
+    }
 
         if (showFollowersList) {
             const followersCard = document.createElement('div');
