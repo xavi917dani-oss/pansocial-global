@@ -1585,14 +1585,15 @@ function processFeedNotifications(data) {
         const originalAuthor = extractCleanHandle(post.originalAuthor || post.parentAuthor || '');
 
         // Detectar post compartido como nueva entrada en el feed
-        if (!isInitialFeedSnapshot && !prevPostEngagement.has(postId)) {
-            if (myHandle && originalAuthor === myHandle && sharedBy && sharedBy !== myHandle) {
-                notifyPostActivity(
-                    `@${sharedBy} compartió tu publicación`,
-                    post.text || 'Publicación en Eggs'
-                );
-            }
-        }
+      if (!isInitialFeedSnapshot && !prevPostEngagement.has(postId)) {
+    if (myHandle && originalAuthor === myHandle && sharedBy && sharedBy !== myHandle) {
+        notifyPostActivity(
+            `@${sharedBy} compartió tu publicación`,
+            post.text || 'Publicación en Eggs',
+            postId
+        );
+    }
+}
 
         // Likes
         const likesRaw = post.likes;
@@ -1646,32 +1647,57 @@ function processFeedNotifications(data) {
 
         const prev = prevPostEngagement.get(postId);
 
-        if (!isInitialFeedSnapshot && prev && myHandle && postAuthor === myHandle) {
-            const newLikers = likeEntries
-                .filter((item) => !(prev.likeKeys && prev.likeKeys.has(item.key)))
-                .map((item) => item.handle)
-                .filter((handle) => handle && handle !== myHandle);
+       if (!isInitialFeedSnapshot && prev && myHandle && postAuthor === myHandle) {
+    const newLikers = likeEntries
+        .filter((item) => !(prev.likeKeys && prev.likeKeys.has(item.key)))
+        .map((item) => item.handle)
+        .filter((handle) => handle && handle !== myHandle);
 
-            if (newLikers.length > 0) {
-                const uniqueLikers = [...new Set(newLikers)];
-                const title = uniqueLikers.length === 1
-                    ? `@${uniqueLikers[0]} le dio me gusta a tu publicación`
-                    : `${uniqueLikers.slice(0, 2).map((u) => `@${u}`).join(' y ')} le dieron me gusta a tu publicación`;
-                notifyPostActivity(title, post.text || 'Publicación en Eggs');
-            } else if (likesCount > prev.likesCount) {
-                const diff = likesCount - prev.likesCount;
+    if (newLikers.length > 0) {
+        const uniqueLikers = [...new Set(newLikers)];
+        const title = uniqueLikers.length === 1
+            ? `@${uniqueLikers[0]} le dio me gusta a tu publicación`
+            : `${uniqueLikers.slice(0, 2).map((u) => `@${u}`).join(' y ')} le dieron me gusta a tu publicación`;
+        notifyPostActivity(title, post.text || 'Publicación en Eggs', postId);
+    } else if (likesCount > prev.likesCount) {
+        const diff = likesCount - prev.likesCount;
+        notifyPostActivity(
+            diff > 1 ? `Alguien dio ${diff} me gusta a tu publicación` : 'A alguien le gustó tu publicación',
+            post.text || 'Publicación en Eggs',
+            postId
+        );
+    }
+
+    if (sharesCount > prev.sharesCount) {
+        const diff = sharesCount - prev.sharesCount;
+        notifyPostActivity(
+            diff > 1 ? `Tu publicación se compartió ${diff} veces` : 'Alguien compartió tu publicación',
+            post.text || 'Publicación en Eggs',
+            postId
+        );
+    }
+
+    for (const commentId of commentIds) {
+        if (!prev.commentIds.has(commentId)) {
+            const comment = commentsObj[commentId] || {};
+            const commenter = extractCleanHandle(comment.author || comment.handle || comment.sender || comment.user || '');
+            if (commenter && commenter !== myHandle) {
                 notifyPostActivity(
-                    diff > 1 ? `Alguien dio ${diff} me gusta a tu publicación` : 'A alguien le gustó tu publicación',
-                    post.text || 'Publicación en Eggs'
+                    `@${commenter} respondió a tu publicación`,
+                    comment.text || post.text || 'Nuevo comentario',
+                    postId
                 );
             }
+        }
+    }
+}
 
-            if (sharesCount > prev.sharesCount) {
-                const diff = sharesCount - prev.sharesCount;
-                notifyPostActivity(
-                    diff > 1 ? `Tu publicación se compartió ${diff} veces` : 'Alguien compartió tu publicación',
-                    post.text || 'Publicación en Eggs'
-                );
+prevPostEngagement.set(postId, {
+    likesCount,
+    likeKeys,
+    sharesCount,
+    commentIds
+});
             }
 
             for (const commentId of commentIds) {
