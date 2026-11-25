@@ -1186,7 +1186,7 @@ window.toggleFollowingList = function() {
             profileContentBox.appendChild(followersCard);
         }
 
-        if (showFollowingList) {
+       if (showFollowingList) {
             const followingCard = document.createElement('div');
             followingCard.className = 'post-card';
             if (!currentProfileFollowing.length) {
@@ -1204,8 +1204,26 @@ window.toggleFollowingList = function() {
                 followingCard.innerHTML = `<div style="font-weight:bold;color:#00d4ff;margin-bottom:4px;">A quién sigue @${escapeHtml(targetHandle)} (${currentProfileFollowing.length})</div>${itemsHtml}`;
             }
             profileContentBox.appendChild(followingCard);
-         }
         }
+
+        const divider = document.createElement('div');
+        divider.className = 'section-divider';
+        divider.textContent = `Publicaciones de @${targetHandle} (${userPosts.length})`;
+        profileContentBox.appendChild(divider);
+
+        const postsContainer = document.createElement('div');
+        postsContainer.style.display = 'flex';
+        postsContainer.style.flexDirection = 'column';
+        postsContainer.style.gap = '12px';
+        profileContentBox.appendChild(postsContainer);
+
+        await renderPosts(
+            userPosts,
+            postsContainer,
+            `@${targetHandle} aún no tiene publicaciones.`
+        );
+    }
+
     window.startEditPost = function(postId) {
         editingPostId = postId;
         refreshActiveView();
