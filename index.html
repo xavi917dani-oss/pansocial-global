@@ -329,12 +329,20 @@
     let currentDbPath = 'rooms/General/messages';
     let currentChatRef = null;
     let viewedProfileHandle = '';
-    let currentProfileFollowing = [];
+    let currentProfileFollowers = [];
+let showFollowersList = false;
+let currentProfileFollowing = [];
 let showFollowingList = false;
+
+window.toggleFollowersList = function() {
+    showFollowersList = !showFollowersList;
+    if (showFollowersList) showFollowingList = false;
+    renderProfileView();
+};
 
 window.toggleFollowingList = function() {
     showFollowingList = !showFollowingList;
-    showFollowersList = false;
+    if (showFollowingList) showFollowersList = false;
     renderProfileView();
 };
     
@@ -1178,25 +1186,6 @@ window.toggleFollowingList = function() {
             profileContentBox.appendChild(followersCard);
         }
 
-        if (showFollowingList) {
-            const followingCard = document.createElement('div');
-            followingCard.className = 'post-card';
-            if (!currentProfileFollowing.length) {
-                followingCard.innerHTML = `<div class="post-body">@${escapeHtml(targetHandle)} aún no sigue a nadie.</div>`;
-            } else {
-                const itemsHtml = currentProfileFollowing.map((followed) => `
-                    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 4px;border-bottom:1px solid #363645;">
-                        <span class="user-link" onclick="showFollowersList=false; showFollowingList=false; openUserProfile('${escapeHtml(followed)}')" title="Ver perfil de @${escapeHtml(followed)}">
-                            ${renderAvatarTag(followed, 'chat-avatar')}
-                            <span>@${escapeHtml(followed)}</span>
-                        </span>
-                        ${renderFollowButtonHtml(followed)}
-                    </div>
-                `).join('');
-                followingCard.innerHTML = `<div style="font-weight:bold;color:#00d4ff;margin-bottom:4px;">A quién sigue @${escapeHtml(targetHandle)} (${currentProfileFollowing.length})</div>${itemsHtml}`;
-            }
-            profileContentBox.appendChild(followingCard);
-        }
 
         if (showFollowersList) {
             const followersCard = document.createElement('div');
